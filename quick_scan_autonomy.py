@@ -69,13 +69,13 @@ def xbee_callback(message):
 # Generate waypoints for VTOL
 def generateWaypoints(configs, search_area):
     print("Begin generating waypoints")
-    
+
     waypointsNED = []
     waypointsLLA = []
-    
+
     origin = search_area.center
     radius = search_area.rad2
-    
+
     # pre-definied in configs file
     altitude = configs["altitude"]
     lat = origin[0]
@@ -84,58 +84,58 @@ def generateWaypoints(configs, search_area):
     n, e, d = ecef2ned(centerX, centerY, centerZ, lat, lon, altitude)
     waypointsLLA.append([lat, lon, altitude])
     waypointsNED.append([n, e, d])
-    
+
     fovH = math.radians(62.2)     # raspicam horizontal FOV
     fovV = math.radians(48.8)     # raspicam vertical FOV
     boxH = 2 * altitude / math.tan(fovH / 2)     # height of bounding box
     boxV = 2 * altitude / math.tan(fovV / 2)     # width of bounding box
-    
+
     b = (0.75 * boxH) / (2 * math.pi)   # distance between coils with 25% overlap
     rotation = -(math.pi / 2)   # number of radians spiral is rotated
     maxTheta = radius / b   # after using formula r = b * theta
-    
+
     theta = 0
     while theta <= maxTheta:
         # distance away from center
         away = b * theta
-        
+
         # distance around center
         around = theta + rotation
-        
+
         # around & away -> x & y
         x = centerX + math.cos(around) * away
         y = centerY + math.sin(around) * away
-        
+
         # convert ECEF to NED and LLA
         n, e, d = ecef2ned(x, y, centerZ, lat, lon, altitude)
         newLat, newLon, newAlt = ned2geodetic(n, e, d, lat, lon, altitude)
         waypointsNED.append([n, e, d])
         waypointsLLA.append([newLat, newLon, newAlt])
-        
+
         # generate a waypoint every pi/8 radian
         theta += configs["d_theta_rad"]
-    
+
     return (waypointsNED, waypointsLLA)
 
 def quick_scan_adds_mission(vehicle, lla_waypoint_list):
     """
-    Adds a takeoff command and four waypoint commands to the current mission. 
+    Adds a takeoff command and four waypoint commands to the current mission.
     The waypoints are positioned to form a square of side length 2*aSize around the specified LocationGlobal (aLocation).
 
-    The function assumes vehicle.commands matches the vehicle mission state 
+    The function assumes vehicle.commands matches the vehicle mission state
     (you must have called download at least once in the session and after clearing the mission)
-    """    
+    """
 
     cmds = vehicle.commands
 
     print(" Clear any existing commands")
-    cmds.clear() 
-    
+    cmds.clear()
+
     print(" Define/add new commands.")
-    # Add new commands. The meaning/order of the parameters is documented in the Command class. 
+    # Add new commands. The meaning/order of the parameters is documented in the Command class.
     lat = 0
     lon = 1
-     
+
     # Add MAV_CMD_NAV_TAKEOFF command. This is ignored if the vehicle is already in the air.
     # This command is there when vehicle is in AUTO mode, where it takes off through command list
     # In guided mode, the actual takeoff function is needed, in which case this command is ignored
@@ -171,6 +171,7 @@ def quick_scan_autonomy(configs, radio):
 
     # Generate waypoints after start_mission = True
     while not autonomy.start_mission:
+
         pass
 
     # Generate waypoints
@@ -200,15 +201,27 @@ def quick_scan_autonomy(configs, radio):
     # Fly about spiral pattern
     if (configs["flight_mode"] == "AUTO"):
         while vehicle.commands.next != vehicle.commands.count:
-            # TODO monitor pause, resume, stop variables
+
+            # monitors pause, resume, stop variables
+
+            if autonomy.pause_mission == True:
+                vehicle.mode = VehicleMode('QHOVER')
+            if autonomy.pause_mission == False:
+                vehicle.mode = VehicleMode('AUTO')
+
+            if autonomy.stop_mission == True:
+                vehicle.mode = VehicleMode('ALT_HOLD')
+
             print(vehicle.location.global_frame)
             time.sleep(1)
     else:
         raise Exception("Guided mode not supported")
 
     land(vehicle)
-    
+
+
+
+
     # Wait for comm simulation thread to end
     if comm_sim:
         comm_sim.join()
-

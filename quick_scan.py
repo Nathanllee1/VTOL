@@ -9,6 +9,8 @@ def quick_scan():
 
     if configs["comms_simulated"]["toggled_on"]:
         xbee = None
+
+        quick_scan_autonomy(configs, xbee)
     # Set up XBee device if communications not simulated
     else:
         xbee = setup_xbee()
